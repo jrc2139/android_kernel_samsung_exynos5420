@@ -193,7 +193,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
 ARCH		?=arm
-CROSS_COMPILE	?=../PLATFORM/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/bin/arm-eabi-
+CROSS_COMPILE	?=../arm-eabi-6.x/bin/arm-eabi-
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -245,8 +245,8 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
-HOSTCXXFLAGS = -O2
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fomit-frame-pointer -std=gnu89
+HOSTCXXFLAGS = -O3
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -318,6 +318,21 @@ endif
 
 export quiet Q KBUILD_VERBOSE
 
+# OPT
+ARM_ARCH_OPT := -mcpu=cortex-a15.cortex-a7 -mtune=cortex-a15.cortex-a7
+GEN_OPT_FLAGS := $(call cc-option,$(ARM_ARCH_OPT),-march=native) \
+ -g0 \
+ -DNDEBUG \
+ -fomit-frame-pointer \
+ -fmodulo-sched \
+ -fmodulo-sched-allow-regmoves \
+ -fivopts
+
+ABYSS_FLAGS     := $(GEN_OPT_FLAGS) -O3 -pipe \
+                   -ffast-math -fsingle-precision-constant -fsched-spec-load \
+                   -fpredictive-commoning -fgcse-after-reload -fgcse-sm \
+                   -fno-pic
+
 
 # Look for make include files relative to root of kernel src
 MAKEFLAGS += --include-dir=$(srctree)
@@ -347,11 +362,11 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   = -mfpu=neon-vfpv4
-AFLAGS_MODULE   =
-LDFLAGS_MODULE  =
-CFLAGS_KERNEL	= -mfpu=neon-vfpv4
-AFLAGS_KERNEL	=
+CFLAGS_MODULE   = -mfpu=neon-vfpv4 -DMODULE $(ABYSS_FLAGS)
+AFLAGS_MODULE   = -DMODULE $(ABYSS_FLAGS)
+LDFLAGS_MODULE  = --strip-debug
+CFLAGS_KERNEL	= -mfpu=neon-vfpv4 $(ABYSS_FLAGS)
+AFLAGS_KERNEL	= $(ABYSS_FLAGS)
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 
@@ -370,11 +385,19 @@ KBUILD_CFLAGS   := -Wall -Werror -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-format-security -Wno-unused \
 		   -fno-delete-null-pointer-checks \
 		   -std=gnu89
-KBUILD_AFLAGS_KERNEL :=
-KBUILD_CFLAGS_KERNEL :=
+
+# Thanks gcc!
+KBUILD_CFLAGS   += -Wno-trigraphs -Wno-unused-label -Wno-array-bounds -Wno-memset-transposed-args \
+                   -Wno-unused-function -Wno-declaration-after-statement \
+                   -Wno-unused-variable -Wno-parentheses -Wno-maybe-uninitialized \
+                   -Wno-misleading-indentation -Wno-bool-compare -Wno-int-conversion \
+                   -Wno-discarded-qualifiers -Wno-tautological-compare -Wno-incompatible-pointer-types
+
+KBUILD_AFLAGS_KERNEL := $(ABYSS_FLAGS)
+KBUILD_CFLAGS_KERNEL := $(ABYSS_FLAGS)
 KBUILD_AFLAGS   := -D__ASSEMBLY__
-KBUILD_AFLAGS_MODULE  := -DMODULE
-KBUILD_CFLAGS_MODULE  := -DMODULE
+KBUILD_AFLAGS_MODULE  := -DMODULE $(ABYSS_FLAGS)
+KBUILD_CFLAGS_MODULE  := -DMODULE $(ABYSS_FLAGS)
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
